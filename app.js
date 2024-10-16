@@ -1,11 +1,10 @@
 const API_URL = "https://gutendex.com/books"
-const ITEMS_PER_PAGE = 10;
+const ITEMS_PER_PAGE = 5;
 
 
 // Fetch books with pagination support
 async function fetchBooks(page = 1)
 {
-    const ITEMS_PER_PAGE = 10;
     const url = `https://gutendex.com/books/?page=${page}`;
     try
     {
@@ -18,13 +17,17 @@ async function fetchBooks(page = 1)
             return { results: [], count: 0 };
         }
 
+        console.log(data)
+
         // Calculate the total number of available pages based on the actual count from API
-        const totalPages = Math.ceil(data.count / ITEMS_PER_PAGE);
+        const totalPages = data.results.length;
+
+        console.log(totalPages)
 
         // Return the books and total pages
         return {
             results: data.results,
-            count: data.count, // Total count from the API
+            count: totalPages, // Total count from the API
             totalPages: totalPages
         };
     } catch (error)
