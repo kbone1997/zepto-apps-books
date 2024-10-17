@@ -1,13 +1,26 @@
 body {
-    font-family: Arial, sans-serif;
-    margin: 0;
+    font-family: 'Poppins', sans-serif;
+    margin-inline: 10%;
     padding: 0;
+    border: 2px solid #0056b3;
+}
+
+.title {
+    font-size: 64px;
+    font-weight: 600;
+    text-align: center;
+}
+
+.page-name {
+    border: 2px solid #0056b3;
 }
 
 nav {
     background-color: #333;
     color: white;
     padding: 1em;
+    margin-top: 3%;
+    border-radius: 14px;
 }
 
 nav ul {
@@ -26,20 +39,61 @@ nav ul li a {
 }
 
 #content {
-    padding: 20px;
+    border: 2px solid #ff5100;
+    align-items: center;
+    justify-items: center;
 }
 
 #book-list,
 #wishlist {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    grid-column-start: 1;
+    grid-column-end: 3;
     gap: 15px;
+    justify-items: center;
+    align-items: center;
+    border: 2px solid #ff5100;
 }
 
 .book {
+    position: relative;
+    width: 300px;
+    height: 400px;
+    border-radius: 14px;
     border: 1px solid #ddd;
     padding: 10px;
     background-color: #f9f9f9;
+    transition: box-shadow 0.3s ease;
+    /* Smooth transition for shadow */
+}
+
+.book-footer {
+    background-color: #333;
+    border: 1px solid #b3b3b3;
+    border-radius: 18px;
+    margin-top: 15%;
+    padding: 10px;
+}
+
+.book-footer-text {
+    color: white;
+}
+
+.book:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    border: 1px solid #b3b3b3;
+    /* Add shadow on hover */
+}
+
+
+.book-title {
+    font-weight: 600;
+}
+
+.cover-image {
+    width: 50%;
+    height: 50%;
+    padding-left: 23%;
 }
 
 #pagination {
@@ -57,6 +111,16 @@ nav ul li a {
     cursor: pointer;
 }
 
+.name {
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.name:hover {
+    border-bottom: 2px solid #f9f9f9;
+    /* Add bottom border on hover */
+}
+
 .page-btn[disabled] {
     background-color: gray;
     cursor: default;
@@ -66,15 +130,42 @@ nav ul li a {
     background-color: #0056b3;
 }
 
-
 .wishlist-btn {
     background-color: #28a745;
     color: white;
     border: none;
     padding: 5px 10px;
     cursor: pointer;
+    border-radius: 12px;
 }
 
 .wishlist-btn:hover {
     background-color: #218838;
+}
+
+/* Spinner styling */
+.spinner {
+    position: absolute;
+    border: 8px solid #f3f3f3;
+    /* Light grey */
+    border-top: 8px solid #333;
+    /* Darker color for the spinning part */
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spin 1s linear infinite;
+    margin-left: 38%;
+    margin-top: 10%;
+    /* Center the spinner */
+}
+
+/* Spin animation */
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
 }

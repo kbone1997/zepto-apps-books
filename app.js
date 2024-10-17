@@ -1,11 +1,13 @@
 const API_URL = "https://gutendex.com/books"
-const ITEMS_PER_PAGE = 5;
+const ITEMS_PER_PAGE = 32;
 
 
 // Fetch books with pagination support
 async function fetchBooks(page = 1)
 {
-    const url = `https://gutendex.com/books/?page=${page}`;
+    const url = `${API_URL}/?page=${page}`;
+    var loadingDiv = document.getElementById('loader');
+    loadingDiv.style.visibility = "visible"
     try
     {
         const response = await fetch(url);
@@ -17,18 +19,12 @@ async function fetchBooks(page = 1)
             return { results: [], count: 0 };
         }
 
-        console.log(data)
-
-        // Calculate the total number of available pages based on the actual count from API
-        const totalPages = data.results.length;
-
-        console.log(totalPages)
-
-        // Return the books and total pages
+        loadingDiv.style.visibility = "hidden"
+        // Return the books and total count
         return {
             results: data.results,
-            count: totalPages, // Total count from the API
-            totalPages: totalPages
+            count: data.count,  // Total count from the API
+            totalPages: Math.ceil(data.count / ITEMS_PER_PAGE) // Correctly calculate total pages
         };
     } catch (error)
     {
@@ -56,35 +52,66 @@ function addToWishlist(book)
 }
 
 // Render books on the page with "Add to Wishlist" button
-function renderBooks(books, containerId, page = 1)
+function renderBooks(books, containerId)
 {
     const bookList = document.getElementById(containerId);
-    bookList.innerHTML = '';  // Clear any existing content
+    bookList.innerHTML = ''; // Clear any existing content
 
-    // Calculate the start and end index for the current page
-    const startIndex = (page - 1) * ITEMS_PER_PAGE;
-    const endIndex = startIndex + ITEMS_PER_PAGE;
-    const paginatedBooks = books.slice(startIndex, endIndex);
-
-    paginatedBooks.forEach(book =>
+    books.forEach(book =>
     {
+        const authorName = book.authors.map(author => author.name).join(', ');
+        //console.log(authorName, authorName.length)
+        const truncatedAuthor = authorName.length >= 25 ? authorName.slice(0, 25) + '...' : authorName;
+        console.log(truncatedAuthor)
+        // Truncate title if it's longer than 30 characters
+        const imageUrl = book.formats && book.formats["image/jpeg"] ? book.formats["image/jpeg"] : 'default-image-url.jpg'; // Provide a default image URL
+        const truncatedTitle = book.title.length > 30 ? book.title.slice(0, 30) + '...' : book.title;
         const bookElement = document.createElement('div');
         bookElement.classList.add('book');
-        bookElement.innerHTML = `
-        <h3>${book.title}</h3>
-        <p>Author: ${book.authors.map(author => author.name).join(', ')}</p>
-        <a href="book.html?id=${book.id}">View Details</a>
-        <button class="wishlist-btn">Add to Wishlist</button>
-      `;
 
-        // Add event listener to add book to wishlist
+        // Check if the book is already in the wishlist
+        const wishlist = JSON.parse(localStorage.getItem('wishlist')) || [];
+        const isInWishlist = wishlist.some(item => item.id === book.id);
+
+        // Define the icon color based on the wishlist status
+        const iconColor = isInWishlist ? 'style="color:red"' : 'style="color:white"'; // Change to your desired class
+
+        bookElement.innerHTML = `
+            <p class="book-title">${truncatedTitle}</p>
+            <img class="cover-image" src="${imageUrl}" alt="${book.title} cover" class="book-image" />
+            <p>Author: ${truncatedAuthor}</p>
+            <div class="book-footer">
+                <a class="book-footer-text" href="book.html?id=${book.id}">Show Details</a>
+                <button class="wishlist-btn">
+                    <i class="fa fa-heart-o" ${iconColor}"></i>
+                </button>
+            </div>
+        `;
+
+        // Add event listener to add/remove book to/from wishlist
         bookElement.querySelector('.wishlist-btn').addEventListener('click', () =>
         {
-            addToWishlist({
-                id: book.id,
-                title: book.title,
-                authors: book.authors.map(author => author.name)
-            });
+            if (isInWishlist)
+            {
+                // Remove from wishlist
+                removeFromWishlist(book.id);
+                alert('Book removed from wishlist!');
+            } else
+            {
+                // Add to wishlist
+                addToWishlist({
+                    id: book.id,
+                    title: book.title,
+                    authors: book.authors,
+                    formats: {
+                        "image/jpeg": book.formats["image/jpeg"]
+                    }
+                });
+            }
+
+            // Update icon color after adding/removing
+            bookElement.querySelector('.wishlist-btn i').classList.toggle('text-red-500', !isInWishlist);
+            bookElement.querySelector('.wishlist-btn i').classList.toggle('text-white', isInWishlist);
         });
 
         bookList.appendChild(bookElement);
@@ -92,87 +119,44 @@ function renderBooks(books, containerId, page = 1)
 }
 
 
-// Render pagination
+// Render pagination with only "Previous" and "Next" buttons
 function renderPagination(currentPage, totalPages)
 {
     const pagination = document.getElementById('pagination');
-    pagination.innerHTML = '';
+    pagination.innerHTML = ''; // Clear existing pagination
 
-    // Prevent pagination if no more pages are available
-    if (totalPages <= 1) return;
-
-    // Helper to create page buttons
-    const createPageButton = (pageNumber) =>
+    // Helper to create a button
+    const createPageButton = (text, pageNumber, disabled = false) =>
     {
         const pageElement = document.createElement('button');
-        pageElement.textContent = pageNumber;
+        pageElement.textContent = text;
         pageElement.classList.add('page-btn');
-        pageElement.disabled = pageNumber === currentPage;
+        pageElement.disabled = disabled; // Disable the button if needed
         pageElement.addEventListener('click', () =>
         {
-            loadBooks(pageNumber);  // Load the selected page
+            loadBooks(pageNumber); // Load the selected page
         });
         pagination.appendChild(pageElement);
     };
 
-    // First Page
-    if (currentPage !== 1)
+    // "Previous Page" button
+    if (currentPage > 1)
     {
-        createPageButton(1);
-        if (currentPage > 3)
-        {
-            const dots = document.createElement('span');
-            dots.textContent = '...';
-            pagination.appendChild(dots);
-        }
+        createPageButton('<', currentPage - 1);
     }
 
-    // Previous, Current, Next Pages
-    for (let i = Math.max(1, currentPage - 1); i <= Math.min(currentPage + 1, totalPages); i++)
-    {
-        createPageButton(i);
-    }
-
-    // Last Page
+    // "Next Page" button
     if (currentPage < totalPages)
     {
-        if (currentPage < totalPages - 2)
-        {
-            const dots = document.createElement('span');
-            dots.textContent = '...';
-            pagination.appendChild(dots);
-        }
-        createPageButton(totalPages);
+        createPageButton('>', currentPage + 1);
     }
 }
-
-
-
-// Load books for the homepage
-async function loadBooks(page = 1)
-{
-    const data = await fetchBooks(page);
-
-    // If no books are returned, prevent pagination
-    if (data.results.length === 0)
-    {
-        renderBooks([], 'book-list');
-        document.getElementById('pagination').innerHTML = '<p>No more books available</p>';
-        return;
-    }
-
-    const totalPages = data.totalPages;
-
-    // Render books and pagination only if there are valid results
-    renderBooks(data.results, 'book-list', page);
-    renderPagination(page, totalPages);
-}
-
 
 // Load wishlist books from localStorage
 function loadWishlist()
 {
     const wishlist = JSON.parse(localStorage.getItem('wishlist')) || [];
+    console.log(wishlist)
     renderBooks(wishlist, 'wishlist');
 }
 
@@ -214,9 +198,11 @@ function renderWishlistBooks(books, page, perPage = 10)
     renderPagination(page, Math.ceil(books.length / perPage));
 }
 
-function loadWishlist(page = 1)
+// Function to remove a book from the wishlist
+function removeFromWishlist(bookId)
 {
-    const wishlist = JSON.parse(localStorage.getItem('wishlist')) || [];
-    renderWishlistBooks(wishlist, page);
+    let wishlist = JSON.parse(localStorage.getItem('wishlist')) || [];
+    wishlist = wishlist.filter(item => item.id !== bookId);
+    localStorage.setItem('wishlist', JSON.stringify(wishlist));
 }
 
