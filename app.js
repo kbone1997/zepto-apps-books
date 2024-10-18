@@ -1,5 +1,6 @@
 const API_URL = "https://gutendex.com/books"
 const ITEMS_PER_PAGE = 32;
+const notFoundImage = "assets/pngwing.com.png";
 
 
 // Fetch books with pagination support
@@ -8,6 +9,8 @@ async function fetchBooks(page = 1)
     const url = `${API_URL}/?page=${page}`;
     var loadingDiv = document.getElementById('loader');
     loadingDiv.style.visibility = "visible"
+    const bookList = document.getElementById("book-list");
+    bookList.innerHTML = ''; // Clear any existing content
     try
     {
         const response = await fetch(url);
@@ -32,6 +35,8 @@ async function fetchBooks(page = 1)
         return { results: [], count: 0 }; // Return empty if there's an error
     }
 }
+
+
 
 
 // Save a book to the wishlist in localStorage
@@ -64,7 +69,7 @@ function renderBooks(books, containerId)
         const truncatedAuthor = authorName.length >= 25 ? authorName.slice(0, 25) + '...' : authorName;
         console.log(truncatedAuthor)
         // Truncate title if it's longer than 30 characters
-        const imageUrl = book.formats && book.formats["image/jpeg"] ? book.formats["image/jpeg"] : 'default-image-url.jpg'; // Provide a default image URL
+        const imageUrl = book.formats && book.formats["image/jpeg"] ? book.formats["image/jpeg"] : notFoundImage; // Provide a default image URL
         const truncatedTitle = book.title.length > 30 ? book.title.slice(0, 30) + '...' : book.title;
         const bookElement = document.createElement('div');
         bookElement.classList.add('book');
@@ -78,7 +83,7 @@ function renderBooks(books, containerId)
 
         bookElement.innerHTML = `
             <p class="book-title">${truncatedTitle}</p>
-            <img class="cover-image" src="${imageUrl}" alt="${book.title} cover" class="book-image" />
+            <img class="cover-image" src="${imageUrl}" cover" class="book-image" />
             <p>Author: ${truncatedAuthor}</p>
             <div class="book-footer">
                 <a class="book-footer-text" href="book.html?id=${book.id}">Show Details</a>
@@ -187,6 +192,53 @@ document.addEventListener('DOMContentLoaded', () =>
         const params = new URLSearchParams(window.location.search);
         const bookId = params.get('id');
         loadBook(bookId);
+    }
+});
+
+document.getElementById('search-btn').addEventListener('click', async function ()
+{
+    const query = document.getElementById('search-input').value.trim();
+
+    if (query)
+    {
+        // Encode the query to make it URL-friendly
+        const encodedQuery = encodeURIComponent(query);
+        // Construct the search URL
+        const searchUrl = `${API_URL}?search=${encodedQuery}`;
+        var loadingDiv = document.getElementById('loader');
+        loadingDiv.style.visibility = "visible"
+        const bookList = document.getElementById("book-list");
+        bookList.innerHTML = ''; // Clear any existing content
+
+        try
+        {
+            const response = await fetch(searchUrl);
+            const data = await response.json();
+
+            // Check if there are books to display
+            if (data.results.length === 0)
+            {
+                return { results: [], count: 0 };
+            }
+
+            loadingDiv.style.visibility = "hidden"
+            const totalPages = Math.ceil(data.count / ITEMS_PER_PAGE);
+
+            console.log(totalPages)
+            // Return the books and total count
+            renderBooks(data.results, 'book-list', 1);
+            if (totalPages > 1)
+            {
+                renderPagination(page, totalPages);
+            }
+        } catch (error)
+        {
+            console.error('Error fetching books:', error);
+            return { results: [], count: 0 }; // Return empty if there's an error
+        }
+    } else
+    {
+        console.log('Please enter a search query');
     }
 });
 
