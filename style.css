@@ -456,4 +456,9 @@ nav ul li a {
     .book-cover {
         justify-content: center;
     }
+
+    .book-info {
+        align-items: center;
+        justify-content: center;
+    }
 }
