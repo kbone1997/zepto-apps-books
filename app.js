@@ -23,6 +23,9 @@ async function fetchBooks(page = 1)
         }
 
         loadingDiv.style.visibility = "hidden"
+        // Save books in localStorage
+        localStorage.setItem('latestBooks', JSON.stringify(data.results));
+        localStorage.setItem('totalPages', Math.ceil(data.count / ITEMS_PER_PAGE));
         // Return the books and total count
         return {
             results: data.results,
@@ -56,7 +59,6 @@ function addToWishlist(book)
     alert('Book added to wishlist!');
 }
 
-// Render books on the page with "Add to Wishlist" button
 function renderBooks(books, containerId)
 {
     const bookList = document.getElementById(containerId);
@@ -65,10 +67,7 @@ function renderBooks(books, containerId)
     books.forEach(book =>
     {
         const authorName = book.authors.map(author => author.name).join(', ');
-        //console.log(authorName, authorName.length)
         const truncatedAuthor = authorName.length >= 25 ? authorName.slice(0, 25) + '...' : authorName;
-        console.log(truncatedAuthor)
-        // Truncate title if it's longer than 30 characters
         const imageUrl = book.formats && book.formats["image/jpeg"] ? book.formats["image/jpeg"] : notFoundImage; // Provide a default image URL
         const truncatedTitle = book.title.length > 30 ? book.title.slice(0, 30) + '...' : book.title;
         const bookElement = document.createElement('div');
@@ -79,30 +78,53 @@ function renderBooks(books, containerId)
         const isInWishlist = wishlist.some(item => item.id === book.id);
 
         // Define the icon color based on the wishlist status
-        const iconColor = isInWishlist ? 'style="color:red"' : 'style="color:white"'; // Change to your desired class
+        const iconColor = isInWishlist ? 'style="color:red"' : 'style="color:white"';
 
         bookElement.innerHTML = `
-            <p class="book-title">${truncatedTitle}</p>
-            <img class="cover-image" src="${imageUrl}" cover" class="book-image" />
-            <p>Author: ${truncatedAuthor}</p>
+            <div class="book-inner">
+                <!-- Front Side -->
+                <div class="book-front">
+                    <p class="book-title">${truncatedTitle}</p>
+                    <img class="cover-image" src="${imageUrl}" alt="Book Cover" />
+                    <p>Author: ${truncatedAuthor}</p>
+                </div>
+                <!-- Back Side -->
+                <div class="book-back">
+                    <p><strong>Title:</strong> ${book.title}</p>
+                    <p><strong>Author:</strong> ${authorName}</p>
+                    <p><strong>Genre:</strong> ${book.subjects ? book.subjects[0] : 'Unknown'}</p>
+                    <p><strong>ID:</strong> ${book.id}</p>
+                </div>
+            </div>
             <div class="book-footer">
                 <a class="book-footer-text" href="book.html?id=${book.id}">Show Details</a>
                 <button class="wishlist-btn">
-                    <i class="fa fa-heart-o" ${iconColor}"></i>
+                    <i class="fa fa-heart-o" ${iconColor}></i>
                 </button>
             </div>
         `;
 
-        // Add event listener to add/remove book to/from wishlist
-        bookElement.querySelector('.wishlist-btn').addEventListener('click', () =>
+        // Prevent book flip when interacting with book-footer (links or buttons)
+        const bookFooter = bookElement.querySelector('.book-footer');
+        bookFooter.addEventListener('click', (event) =>
         {
+            event.stopPropagation(); // Prevent flip on book-footer click
+        });
+
+        // Add event listener to add/remove book to/from wishlist
+        bookElement.querySelector('.wishlist-btn').addEventListener('click', (event) =>
+        {
+            event.stopPropagation(); // Prevent book flip when clicking wishlist button
+            const icon = bookElement.querySelector('.wishlist-btn i');
             if (isInWishlist)
             {
+                icon.style.color = 'white';
                 // Remove from wishlist
                 removeFromWishlist(book.id);
                 alert('Book removed from wishlist!');
             } else
             {
+                icon.style.color = 'red';
                 // Add to wishlist
                 addToWishlist({
                     id: book.id,
@@ -110,19 +132,15 @@ function renderBooks(books, containerId)
                     authors: book.authors,
                     formats: {
                         "image/jpeg": book.formats["image/jpeg"]
-                    }
+                    },
+                    subjects: book.subjects
                 });
             }
-
-            // Update icon color after adding/removing
-            bookElement.querySelector('.wishlist-btn i').classList.toggle('text-red-500', !isInWishlist);
-            bookElement.querySelector('.wishlist-btn i').classList.toggle('text-white', isInWishlist);
         });
 
         bookList.appendChild(bookElement);
     });
 }
-
 
 // Render pagination with only "Previous" and "Next" buttons
 function renderPagination(currentPage, totalPages)
@@ -165,16 +183,6 @@ function loadWishlist()
     renderBooks(wishlist, 'wishlist');
 }
 
-// Load a single book by ID
-async function loadBooks(page = 1)
-{
-    const data = await fetchBooks(page);
-    const totalPages = Math.ceil(data.count / ITEMS_PER_PAGE);  // Total number of pages
-
-    renderBooks(data.results, 'book-list', page);
-    renderPagination(page, totalPages);
-}
-
 
 // Initialize based on the current page
 document.addEventListener('DOMContentLoaded', () =>
@@ -183,7 +191,7 @@ document.addEventListener('DOMContentLoaded', () =>
 
     if (currentPage === 'index.html' || currentPage === '')
     {
-        loadBooks(1);  // Load books for the home page
+        loadBooksFromLocalStorage();  // Load books for the home page
     } else if (currentPage === 'wishlist.html')
     {
         loadWishlist();  // Load wishlist books from localStorage
@@ -191,8 +199,18 @@ document.addEventListener('DOMContentLoaded', () =>
     {
         const params = new URLSearchParams(window.location.search);
         const bookId = params.get('id');
-        loadBook(bookId);
+        fetchBookDetails(bookId);
     }
+});
+
+// Add event listeners to genre dropdown items
+document.querySelectorAll('.dropdown-content p').forEach(item =>
+{
+    item.addEventListener('click', function ()
+    {
+        const selectedGenre = this.getAttribute('data-topic'); // Get the genre from the data-topic attribute
+        searchBooksByTopic(selectedGenre); // Perform the search with the selected genre
+    });
 });
 
 document.getElementById('search-btn').addEventListener('click', async function ()
@@ -223,6 +241,9 @@ document.getElementById('search-btn').addEventListener('click', async function (
 
             loadingDiv.style.visibility = "hidden"
             const totalPages = Math.ceil(data.count / ITEMS_PER_PAGE);
+            // Save books in localStorage
+            localStorage.setItem('latestBooks', JSON.stringify(data.results));
+            localStorage.setItem('totalPages', totalPages);
 
             console.log(totalPages)
             // Return the books and total count
@@ -256,5 +277,105 @@ function removeFromWishlist(bookId)
     let wishlist = JSON.parse(localStorage.getItem('wishlist')) || [];
     wishlist = wishlist.filter(item => item.id !== bookId);
     localStorage.setItem('wishlist', JSON.stringify(wishlist));
+}
+
+// Function to search for books by topic
+function searchBooksByTopic(topic)
+{
+    const apiUrl = `${API_URL}/?topic=${encodeURIComponent(topic)}`; // Assuming your API endpoint looks like this
+    // You can add a loading spinner or some UI feedback while the data is being fetched
+    var loadingDiv = document.getElementById('loader');
+    loadingDiv.style.visibility = "visible"
+    const bookList = document.getElementById("book-list");
+    bookList.innerHTML = '';
+
+    fetch(apiUrl)
+        .then(response => response.json())
+        .then(data =>
+        {
+            document.getElementById('loader').style.display = 'hidden'; // Hide loader once data is fetched
+            localStorage.setItem('latestBooks', JSON.stringify(data.results));
+            renderBooks(data.results, 'book-list'); // Assuming you already have a renderBooks function
+        })
+        .catch(error =>
+        {
+            document.getElementById('loader').style.display = 'hidden';
+            console.error('Error fetching books:', error);
+        });
+}
+
+// Render books from localStorage if available
+function loadBooksFromLocalStorage()
+{
+    const savedBooks = localStorage.getItem('latestBooks');
+    const savedPages = localStorage.getItem('totalPages');
+
+    if (savedBooks)
+    {
+        const books = JSON.parse(savedBooks);
+        const totalPages = parseInt(savedPages, 10);
+        console.log('Loading books from localStorage');
+
+        renderBooks(books, 'book-list'); // Render books
+        renderPagination(1, totalPages);
+    }
+    else
+    {
+        console.log('No books found in localStorage, fetching from API');
+        loadBooks(1); // Fetch from API if no books in localStorage
+    }
+}
+
+// Fetch and display book details
+async function fetchBookDetails(bookId)
+{
+    const bookDetailsUrl = `${API_URL}?ids=${bookId}`; // Assuming your API URL supports fetching a book by its ID
+
+    try
+    {
+        const response = await fetch(bookDetailsUrl);
+        const book = await response.json();
+
+        console.log(book)
+        // Render the book details
+        renderBookDetails(book.results[0]);
+    } catch (error)
+    {
+        console.error('Error fetching book details:', error);
+    }
+}
+
+// Function to render book details on the page
+function renderBookDetails(book)
+{
+    const bookDetailsDiv = document.getElementById('book-details');
+
+    const authorName = book.authors.map(author => author.name).join(', ');
+    const bookDetailsHTML = `
+        <div class="book-details-container">
+            <div class="book-cover">
+                <img src="${book.formats && book.formats['image/jpeg'] ? book.formats['image/jpeg'] : notFoundImage}" alt="Book Cover" class="book-cover-image" />
+            </div>
+            <div class="book-info">
+                <h2>Title:${book.title}</h2>
+                <p><strong>Author:</strong> ${authorName}</p>
+                <p><strong>Genre:</strong> ${book.subjects ? book.subjects[0] : 'Unknown'}</p>
+                <p><strong>ID:</strong> ${book.id}</p>
+                <p>${book.description || 'No description available.'}</p>
+            </div>
+        </div>
+    `;
+
+    bookDetailsDiv.innerHTML = bookDetailsHTML;
+}
+
+// Load a single book by ID
+async function loadBooks(page = 1)
+{
+    const data = await fetchBooks(page);
+    const totalPages = Math.ceil(data.count / ITEMS_PER_PAGE);  // Total number of pages
+
+    renderBooks(data.results, 'book-list', page);
+    renderPagination(page, totalPages);
 }
 
